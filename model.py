@@ -7,8 +7,9 @@ from keras.applications.inception_v3 import InceptionV3
 from sklearn.preprocessing import LabelBinarizer
 import tensorflow as tf
 from keras.preprocessing.image import ImageDataGenerator
-from keras.models import Sequential
+from keras.models import Sequential, Model
 from keras.layers.core import Dense, Activation, Flatten
+from keras.layers import GlobalAveragePooling2D, Input, Lambda
 
 def get_data(): 
     lines = [] 
@@ -52,14 +53,24 @@ def one_hot_encode(y_data):
     y_one_hot = label_binarizer.fit_transform(y_data)
     return y_one_hot
 
+## TODO play with those parameters, make sure that the outputs are consistant, that is what caused the issue before!!!! 
+## TODO Decided what parameters are ok to modify
+## TODO test the output!
 def get_model():
-#     model = InceptionV3(weights='imagenet', include_top=False)
-    model = Sequential()
-    model.add(Flatten(input_shape=(160, 320, 3)))
-    model.add(Dense(500))
-    model.add(Activation('relu'))
-    model.add(Dense(31))
-    model.add(Activation('softmax'))
+    inception = InceptionV3(weights='imagenet', include_top=False)
+    
+    model_input_size = 139
+    image_input = Input(shape=(160, 320, 3))
+    
+    resized_input = Lambda(lambda image: tf.image.resize_images(image, (model_input_size, model_input_size)))(image_input)
+    inp = inception(resized_input)
+    x = GlobalAveragePooling2D()(inp)
+    x = Dense(512, activation='relu')(x)
+    predictions = Dense(31, activation = 'softmax')(x)
+    
+    model = Model(inputs=image_input, outputs=predictions)
+    model.summary()
+    return model
               
     return model
 
