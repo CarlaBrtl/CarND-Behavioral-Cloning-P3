@@ -24,7 +24,6 @@ def get_data():
     for line in lines[1:]: 
         source_path = line[0][18:]
         source_path = '/opt/data/IMG/' + source_path
-        image = cv2.imread(source_path)
         images.append(image)
         steering_angle = float(line[6])
         measurements.append(str(round(steering_angle))) 
@@ -59,11 +58,9 @@ def one_hot_encode(y_data):
 def get_model():
     inception = InceptionV3(weights='imagenet', include_top=False)
     
-    model_input_size = 139
     image_input = Input(shape=(160, 320, 3))
     
-    resized_input = Lambda(lambda image: tf.image.resize_images(image, (model_input_size, model_input_size)))(image_input)
-    inp = inception(resized_input)
+    inp = inception(image_input)
     x = GlobalAveragePooling2D()(inp)
     x = Dense(512, activation='relu')(x)
     predictions = Dense(31, activation = 'softmax')(x)
