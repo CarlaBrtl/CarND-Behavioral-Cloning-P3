@@ -66,8 +66,8 @@ def telemetry(sid, data):
         steering_angle_one_hot = model.predict(image_array[None, :, :, :], batch_size=1)
         print(steering_angle_one_hot)
         label_binarizer = LabelBinarizer()
-        label_binarizer.fit(range(0, 31))
-        steering_angle = float(label_binarizer.inverse_transform(steering_angle_one_hot))  + 1
+        label_binarizer.fit(range(0, 201))
+        steering_angle = float((label_binarizer.inverse_transform(steering_angle_one_hot)/100) - 1) 
         
         throttle = controller.update(float(speed))
 

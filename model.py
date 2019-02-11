@@ -28,20 +28,20 @@ def get_data():
         image = cv2.imread(source_path)
         if image is not None:
             images.append(image)
-            steering_angle = float(line[6])
-            measurements.append(round(steering_angle))
+            steering_angle = float(line[3])
+            measurements.append(round(steering_angle, 2))
         
     print('Total number of images loaded: ' + str(len(images)))
     print('Measurements: ' + str(np.unique(measurements)))
-    plot_maesurements(measurements)
-    return images, measurements
+    plot_measurements(measurements)
+    return images, np.array(measurements)
 
-def plot_maesurements(measurements):
+def plot_measurements(measurements):
     
-    n_classes = len(np.unique(measurements))
+    n_classes = 201
     class_count = np.zeros(n_classes)
     for y in measurements:
-        class_count[y - 1] += 1
+        class_count[int((y + 1) * 100)] += 1
     
     N = len(class_count)
     classes = range(N)
@@ -67,10 +67,11 @@ def preprocess(X_data):
 
 def one_hot_encode(y_data):
     label_binarizer = LabelBinarizer()
-    label_binarizer.fit(range(0, 31))
+    label_binarizer.fit(range(0, 201))
     print("classes")
     print(label_binarizer.classes_)
-    y_one_hot = label_binarizer.transform(y_data)
+    scaled_y_data = np.array((y_data + 1) * 100)
+    y_one_hot = label_binarizer.transform(scaled_y_data.astype(int))
     return y_one_hot
 
 ## TODO play with those parameters, make sure that the outputs are consistant, that is what caused the issue before!!!! 
@@ -84,7 +85,7 @@ def get_model():
     inp = inception(image_input)
     x = GlobalAveragePooling2D()(inp)
     x = Dense(512, activation='relu')(x)
-    predictions = Dense(31, activation = 'softmax')(x)
+    predictions = Dense(201, activation = 'softmax')(x)
     
     model = Model(inputs=image_input, outputs=predictions)
     model.summary()
