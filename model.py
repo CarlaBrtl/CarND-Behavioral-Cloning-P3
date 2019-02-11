@@ -2,6 +2,7 @@
 import csv
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
 from sklearn.utils import shuffle
 from keras.applications.inception_v3 import InceptionV3
 from sklearn.preprocessing import LabelBinarizer
@@ -24,12 +25,29 @@ def get_data():
     for line in lines[1:]: 
         source_path = line[0][18:]
         source_path = '/opt/data/IMG/' + source_path
-        images.append(image)
-        steering_angle = float(line[6])
-        measurements.append(str(round(steering_angle))) 
+        image = cv2.imread(source_path)
+        if image != None:
+            images.append(image)
+            steering_angle = float(line[6])
+            measurements.append(round(steering_angle))
         
     print('Total number of images loaded: ' + str(len(images)))
+    print('Measurements: ' + str(np.unique(measurements)))
+    plot_maesurements(measurements)
     return images, measurements
+
+def plot_maesurements(measurements):
+    
+    n_classes = len(np.unique(measurements))
+    class_count = np.zeros(n_classes)
+    for y in measurements:
+        class_count[y] += 1
+    
+    N = len(class_count)
+    classes = range(N)
+    width = 1/1.5
+    plt.bar(classes, class_count, width, color="blue")
+    plt.savefig("plot.jpg")
 
 # Shuffle the data, use 70% for training, and 30% for validation 
 def separate_training_and_validation_data(X_data, y_data, training_percent = 70): 
@@ -49,7 +67,10 @@ def preprocess(X_data):
 
 def one_hot_encode(y_data):
     label_binarizer = LabelBinarizer()
-    y_one_hot = label_binarizer.fit_transform(y_data)
+    label_binarizer.fit(range(0, 31))
+    print("classes")
+    print(label_binarizer.classes_)
+    y_one_hot = label_binarizer.transform(y_data)
     return y_one_hot
 
 ## TODO play with those parameters, make sure that the outputs are consistant, that is what caused the issue before!!!! 
@@ -69,7 +90,6 @@ def get_model():
     model.summary()
     return model
               
-    return model
 
 def data_generator(X_train, y_train): 
     for i in range(len(X_train)):
@@ -105,5 +125,6 @@ X_train = preprocess(X_train)
 X_valid = preprocess(X_valid) 
 
 train(X_train, y_train, X_valid, y_valid)
+
 
 
