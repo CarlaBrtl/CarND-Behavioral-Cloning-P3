@@ -15,7 +15,7 @@ from keras.layers import GlobalAveragePooling2D, Input, Lambda
 def get_data(): 
     lines = [] 
     # with open('../data_sample/driving_log.csv') as csvfile: 
-    with open('/opt/data/driving_log.csv') as csvfile:
+    with open('data/driving_log.csv') as csvfile:
         reader = csv.reader(csvfile)
         for line in reader: 
             lines.append(line) 
@@ -23,10 +23,10 @@ def get_data():
     images = [] ## images = x in our architecture
     measurements = [] ## measurements = y in our architecture
     for line in lines[1:]: 
-        source_path = line[0][18:]
-        source_path = '/opt/data/IMG/' + source_path
+        source_path = line[0]
+        source_path = 'data/' + source_path
         image = cv2.imread(source_path)
-        if image != None:
+        if image is not None:
             images.append(image)
             steering_angle = float(line[6])
             measurements.append(round(steering_angle))
@@ -41,7 +41,7 @@ def plot_maesurements(measurements):
     n_classes = len(np.unique(measurements))
     class_count = np.zeros(n_classes)
     for y in measurements:
-        class_count[y] += 1
+        class_count[y - 1] += 1
     
     N = len(class_count)
     classes = range(N)
