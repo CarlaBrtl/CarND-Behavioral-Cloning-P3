@@ -12,60 +12,44 @@ import tensorflow as tf
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import Sequential, Model
 from keras.layers.core import Dense, Activation, Flatten, Dropout
-from keras.layers import GlobalAveragePooling2D, Input, Lambda
+from keras.layers import GlobalAveragePooling2D, Input, Lambda, Cropping2D
+from sklearn.model_selection import train_test_split
 
-def get_data(): 
+def get_image_names(): 
     lines = [] 
     # with open('../data_sample/driving_log.csv') as csvfile: 
     with open('data/driving_log.csv') as csvfile:
         reader = csv.reader(csvfile)
         for line in reader: 
-            lines.append(line) 
-        
-    images = [] ## images = x in our architecture
-    measurements = [] ## measurements = y in our architecture
-    for line in lines[1:]: 
-        source_path = line[0]
-        source_path = 'data/' + source_path
-        image = cv2.imread(source_path)
-        if image is not None:
-            images.append(image)
-            steering_angle = float(line[3])
-            measurements.append(steering_angle)
-        
-    print('Total number of images loaded: ' + str(len(images)))
-    print('Measurements: ' + str(np.unique(measurements)))
-    plot_measurements(measurements)
-    return images, np.array(measurements)
+            lines.append(line)
+   return lines         
+            
+def generator(samples, batch_size=32):
+    num_samples = len(samples)
+    while 1: # Loop forever so the generator never terminates
+        shuffle(samples)
+        for offset in range(0, num_samples, batch_size):
+            batch_samples = samples[offset:offset+batch_size]
 
+            images = []
+            angles = []
+            for batch_sample in batch_samples:
+                name = './IMG/'+batch_sample[0].split('/')[-1]
+                center_image = cv2.imread(name)
+                center_angle = float(batch_sample[3])
+                images.append(center_image)
+                angles.append(center_angle)
+
+            # trim image to only see section with road
+            X_train = np.array(images)
+            y_train = np.array(angles)
+            yield sklearn.utils.shuffle(X_train, y_train)
+
+## TODO Change this
 def plot_measurements(measurements):
     
-    n_classes = 201
-    class_count = np.zeros(n_classes)
-    for y in measurements:
-        class_count[int((y + 1) * 100)] += 1
-    
-    N = len(class_count)
-    classes = range(N)
-    width = 1/1.5
-    plt.bar(classes, class_count, width, color="blue")
+    plt.bar(measurements, color="blue")
     plt.savefig("plot.jpg")
-
-# Shuffle the data, use 70% for training, and 30% for validation 
-def separate_training_and_validation_data(X_data, y_data, training_percent = 70): 
-    X_data, y_data = shuffle(X_data, y_data)
-    
-    training_len = int(len(X_data) * training_percent / 100)
-    
-    X_train, y_train, X_valid, y_valid = X_data[:training_len], y_data[:training_len], X_data[training_len:], y_data[training_len:]
-    print('Size of training set: ' + str(len(X_train)))
-    print('Size of validation set: ' + str(len(X_valid)))
-    return np.array(X_train), np.array(y_train), np.array(X_valid), np.array(y_valid)
-
-# Preprocess the image by normalizing it 
-    
-def preprocess(X_data):
-    return (X_data - 128) / 128
 
 ## TODO play with those parameters, make sure that the outputs are consistant, that is what caused the issue before!!!! 
 ## TODO Decided what parameters are ok to modify
@@ -76,8 +60,9 @@ def get_model():
         layer.trainable=False
     
     image_input = Input(shape=(160, 320, 3))
-    
-    inp = inception(image_input)
+    normalized = Lambda(lambda x: (x / 255.0) - 0.5)(image_input)
+    cropped = Cropping2D(cropping=((50,20), (0,0)))(normalized)
+    inp = inception(normalized)
     x = GlobalAveragePooling2D()(inp)
     x = Dense(1024, activation='relu')(x)
     x = Dense(512, activation='relu')(x)
@@ -87,55 +72,30 @@ def get_model():
     model.summary()
     return model
               
-def get_model_no():
-       # Create the Sequential model
-    model = Sequential()
-    model.add(Conv2D(32, (3, 3), input_shape=(160, 320, 3)))
-    model.add(MaxPooling2D((2, 2)))
-    model.add(Dropout(0.5))
-    model.add(Activation('relu'))
-    model.add(Flatten())
-    model.add(Dense(512))
-    model.add(Activation('relu'))
-    model.add(Dense(1))
-    model.add(Activation('relu'))
-    
-    model.summary()
-    
-    return model
-
-
 def data_generator(X_train, y_train): 
     for i in range(len(X_train)):
         yield X_train[i], y_train[i]
     
-def train(X_train, y_one_hot_train, X_val, y_one_hot_val, batch_size=32, epochs=2): 
+def train(train_samples, validation_samples, batch_size=32, epochs=2): 
     print('Training')
     model = get_model()
-    datagen = ImageDataGenerator()
-    val_datagen = ImageDataGenerator()
-    
+
     model.compile(loss = 'mse' , optimizer='adam')
     
-    print(X_train.shape)
-    print(y_one_hot_train.shape)
-    print(X_val.shape)
-    print(y_one_hot_val.shape)
-    model.fit_generator(datagen.flow(X_train, y_one_hot_train, batch_size=batch_size), 
-                    steps_per_epoch=len(X_train)/batch_size, epochs=epochs, verbose=1, 
-                    validation_data=val_datagen.flow(X_val, y_one_hot_val, batch_size=batch_size),
+    model.fit_generator(traincd_generator, steps_per_epoch=len(X_train)/batch_size, epochs=epochs, verbose=1, 
+                    validation_data=validation_generator,
                     validation_steps=len(X_val)/batch_size)
     
     model.save('model.h5')
+    return model 
 
+X_data_names = get_image_names
 
-X_data, y_data = get_data()
-X_train, y_train, X_valid, y_valid = separate_training_and_validation_data(X_data, y_data) 
+# Shuffle the data, use 70% for training, and 30% for validation 
+X_data_names_train , X_data_names_valid = train_test_split(X_data_names, test_size=0.3)
 
-X_train = preprocess(X_train)
-X_valid = preprocess(X_valid) 
+train_generator = generator(train_samples, batch_size=32)
+validation_generator = generator(validation_samples, batch_size=32)
 
-train(X_train, y_train, X_valid, y_valid)
-
-
+model = train(train_generator, validation_generator)
 
