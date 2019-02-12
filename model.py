@@ -1,4 +1,6 @@
 # Load the data 
+
+### Move the folder from root/Desktop/data to /opt/carnd_p3/data
 import csv
 import cv2
 import numpy as np
