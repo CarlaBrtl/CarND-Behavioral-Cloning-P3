@@ -5,11 +5,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.utils import shuffle
 from keras.applications.inception_v3 import InceptionV3
+from keras.layers.convolutional import Conv2D
+from keras.layers.pooling import MaxPooling2D
 from sklearn.preprocessing import LabelBinarizer
 import tensorflow as tf
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import Sequential, Model
-from keras.layers.core import Dense, Activation, Flatten
+from keras.layers.core import Dense, Activation, Flatten, Dropout
 from keras.layers import GlobalAveragePooling2D, Input, Lambda
 
 def get_data(): 
@@ -29,7 +31,7 @@ def get_data():
         if image is not None:
             images.append(image)
             steering_angle = float(line[3])
-            measurements.append(round(steering_angle, 2))
+            measurements.append(steering_angle)
         
     print('Total number of images loaded: ' + str(len(images)))
     print('Measurements: ' + str(np.unique(measurements)))
@@ -65,44 +67,55 @@ def separate_training_and_validation_data(X_data, y_data, training_percent = 70)
 def preprocess(X_data):
     return (X_data - 128) / 128
 
-def one_hot_encode(y_data):
-    label_binarizer = LabelBinarizer()
-    label_binarizer.fit(range(0, 201))
-    print("classes")
-    print(label_binarizer.classes_)
-    scaled_y_data = np.array((y_data + 1) * 100)
-    y_one_hot = label_binarizer.transform(scaled_y_data.astype(int))
-    return y_one_hot
-
 ## TODO play with those parameters, make sure that the outputs are consistant, that is what caused the issue before!!!! 
 ## TODO Decided what parameters are ok to modify
 ## TODO test the output!
 def get_model():
     inception = InceptionV3(weights='imagenet', include_top=False)
+    for layer in inception.layers: 
+        layer.trainable=False
     
     image_input = Input(shape=(160, 320, 3))
     
     inp = inception(image_input)
     x = GlobalAveragePooling2D()(inp)
+    x = Dense(1024, activation='relu')(x)
     x = Dense(512, activation='relu')(x)
-    predictions = Dense(201, activation = 'softmax')(x)
+    predictions = Dense(1)(x)
     
     model = Model(inputs=image_input, outputs=predictions)
     model.summary()
     return model
               
+def get_model_no():
+       # Create the Sequential model
+    model = Sequential()
+    model.add(Conv2D(32, (3, 3), input_shape=(160, 320, 3)))
+    model.add(MaxPooling2D((2, 2)))
+    model.add(Dropout(0.5))
+    model.add(Activation('relu'))
+    model.add(Flatten())
+    model.add(Dense(512))
+    model.add(Activation('relu'))
+    model.add(Dense(1))
+    model.add(Activation('relu'))
+    
+    model.summary()
+    
+    return model
+
 
 def data_generator(X_train, y_train): 
     for i in range(len(X_train)):
         yield X_train[i], y_train[i]
     
-def train(X_train, y_one_hot_train, X_val, y_one_hot_val, batch_size=32, epochs=5): 
+def train(X_train, y_one_hot_train, X_val, y_one_hot_val, batch_size=32, epochs=2): 
     print('Training')
     model = get_model()
     datagen = ImageDataGenerator()
     val_datagen = ImageDataGenerator()
     
-    model.compile(optimizer='Adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(loss = 'mse' , optimizer='adam')
     
     print(X_train.shape)
     print(y_one_hot_train.shape)
@@ -115,11 +128,8 @@ def train(X_train, y_one_hot_train, X_val, y_one_hot_val, batch_size=32, epochs=
     
     model.save('model.h5')
 
-# Create the model 
-# Train the model, and evaluate
-# Run the 
+
 X_data, y_data = get_data()
-y_data = one_hot_encode(y_data)
 X_train, y_train, X_valid, y_valid = separate_training_and_validation_data(X_data, y_data) 
 
 X_train = preprocess(X_train)
